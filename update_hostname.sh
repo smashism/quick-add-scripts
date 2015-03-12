@@ -8,7 +8,7 @@
 #
 
 # Set CocoaDialog Location
-CD="/Library/Application Support/JAMF/bin/cocoaDialog.app/Contents/MacOS/cocoaDialog"
+CD="/path/to/cocoaDialog.app/Contents/MacOS/cocoaDialog"
 
 # Dialog to enter the computer name and the create $ASSETTAG variable
 rv=($("$CD" standard-inputbox --title "Computer Name" --no-newline --informative-text "Enter the Computer Name (Based on Asset Tag)" --value-required))

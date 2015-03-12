@@ -1,0 +1,49 @@
+#!/bin/sh
+
+####################################################
+## Use the legacy binary if running on < 10.5 
+####################################################
+os_version=$(system_profiler SPSoftwareDataType -xml | grep -A 2 'os_version</key>' | grep -o 'OS X [0-9]\+.[0-9]\+' | grep -o '[0-9]\+.[0-9]\+')
+major_version=$(echo $os_version | grep -o '[0-9]\+\.' | grep -o '[0-9]\+')
+minor_version=$(echo $os_version | grep -o '\.[0-9]\+' | grep -o '[0-9]\+')
+if [ $major_version -lt 10 ] || [ $major_version -eq 10 -a $minor_version -lt 7 ];then
+   /bin/rm /usr/sbin/jamf
+   /bin/mv /usr/sbin/jamf2 /usr/sbin/jamf
+   /bin/chmod +x /usr/sbin/jamf
+else
+   /bin/rm /usr/sbin/jamf2
+fi
+
+####################################################
+## Create the configuration file at:
+## /Library/Preferences/com.jamfsoftware.jamf.plist
+####################################################
+/usr/sbin/jamf createConf -url 'https://your.jss.com:8443/' -k # your JSS URL will be auto-populated when QuickAdd is created in Recon.app
+
+####################################################
+## Turn on SSH
+####################################################
+/usr/sbin/jamf startSSH
+
+####################################################
+## Run enroll
+####################################################
+/usr/sbin/jamf enroll -invitation 00000000000000000000000 # invitation number will be auto-populated when QuickAdd is created in Recon.app
+
+enrolled=$?
+
+# Run policies with the custom trigger "quickadd"
+/usr/sbin/jamf policy -event quickadd
+
+# update inventory after quickadd policies
+/usr/sbin/jamf recon
+
+# run policies with the custom trigger "config", see http://bit.ly/1x04fj3
+/usr/sbin/jamf policy -event config
+
+# update inventory one last time and run any remaining policies
+/usr/sbin/jamf manage
+/usr/sbin/jamf recon
+
+# done!
+exit $enrolled

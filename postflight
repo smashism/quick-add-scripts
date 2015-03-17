@@ -18,7 +18,7 @@ fi
 ## Create the configuration file at:
 ## /Library/Preferences/com.jamfsoftware.jamf.plist
 ####################################################
-/usr/sbin/jamf createConf -url 'https://your.jss.com:8443/' -k # your JSS URL will be auto-populated when QuickAdd is created in Recon.app
+/usr/sbin/jamf createConf -url 'https://jss.yourcompany.com:8443/' -k # your JSS URL will be auto-populated when QuickAdd is created in Recon.app
 
 ####################################################
 ## Turn on SSH

@@ -1,0 +1,75 @@
+#!/bin/bash
+
+# Largely cobbled together from github.com/homebysix/jss-filevault-reissue/
+# Thank you kindly to github.com/rderewianko for the idea
+# Last modified 2016-11-28
+#
+# This script uses AppleScript to prompt for a hostname, then sets it on the computer.
+# Recommended: a recon at the end of the QuickAdd enrollment workflow to make sure the JSS
+# shows the correct username.
+#
+# Provided as-is without support or warranty. 
+# Please test and verify before deploying in production.
+
+################################## VARIABLES ##################################
+
+# Set icon and title for AppleScript window.
+LOGO_ICNS=/System/Library/PreferencePanes/SharingPref.prefPane/Contents/Resources/SharingPref.icns
+PROMPT_TITLE="YOUR COMPANY Computer Provisioning"
+
+######################## VALIDATION AND ERROR CHECKING ########################
+
+# Suppress errors for the duration of this script. (This prevents JAMF Pro from
+# marking a policy as "failed" if the words "fail" or "error" inadvertently
+# appear in the script output.)
+exec 2>/dev/null
+BAIL=false
+
+# Convert POSIX path of logo icon to Mac path for AppleScript
+LOGO_ICNS="$(osascript -e 'tell application "System Events" to return POSIX file "'"$LOGO_ICNS"'" as text')"
+
+# Bail out if jamfHelper doesn't exist.
+jamfHelper="/Library/Application Support/JAMF/bin/jamfHelper.app/Contents/MacOS/jamfHelper"
+if [[ ! -x "$jamfHelper" ]]; then
+    echo "[ERROR] jamfHelper not found."
+    BAIL=true
+fi
+
+################################ MAIN PROCESS #################################
+
+# Get information necessary to display messages in the current user's context.
+
+# Check the OS version.
+OS_MAJOR=$(sw_vers -productVersion | awk -F . '{print $1}')
+OS_MINOR=$(sw_vers -productVersion | awk -F . '{print $2}')
+if [[ "$OS_MAJOR" -ne 10 || "$OS_MINOR" -lt 9 ]]; then
+    echo "[ERROR] OS version not 10.9+ or OS version unrecognized."
+    sw_vers -productVersion
+    BAIL=true
+fi
+
+# Get the logged in user's name.
+CURRENT_USER="$(stat -f%Su /dev/console)"
+
+# Get information necessary to display messages in the current user's context.
+USER_ID=$(id -u "$CURRENT_USER")
+if [[ "$OS_MAJOR" -eq 10 && "$OS_MINOR" -le 9 ]]; then
+    L_ID=$(pgrep -x -u "$USER_ID" loginwindow)
+    L_METHOD="bsexec"
+elif [[ "$OS_MAJOR" -eq 10 && "$OS_MINOR" -gt 9 ]]; then
+    L_ID=USER_ID
+    L_METHOD="asuser"
+fi
+
+# Ask the logged-in user to enter a computer name.
+echo "Prompting for computer name..."
+COMP_NAME="$(launchctl "$L_METHOD" "$L_ID" osascript -e 'display dialog "Please enter the computer name for this Mac:" default answer "" with title "'"${PROMPT_TITLE//\"/\\\"}"'" giving up after 86400 with text buttons {"OK"} default button 1 with icon file "'"${LOGO_ICNS//\"/\\\"}"'"' -e 'return text returned of result')"
+
+# Setting computername
+echo "Setting computer name..."
+scutil --set ComputerName $COMP_NAME
+scutil --set HostName $COMP_NAME
+scutil --set LocalHostName $COMP_NAME
+
+echo "Computer name set to $COMP_NAME!"
+exit 0

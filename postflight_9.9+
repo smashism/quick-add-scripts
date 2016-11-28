@@ -1,0 +1,50 @@
+#!/bin/sh
+
+####################################################
+## Use the legacy binary if running on < 10.7 
+####################################################
+os_version=$(system_profiler SPSoftwareDataType -xml | grep -A 2 'os_version</key>' | grep -o 'OS X [0-9]\+.[0-9]\+' | grep -o '[0-9]\+.[0-9]\+')
+major_version=$(echo $os_version | grep -o '[0-9]\+\.' | grep -o '[0-9]\+')
+minor_version=$(echo $os_version | grep -o '\.[0-9]\+' | grep -o '[0-9]\+')
+/usr/bin/tar -xf /private/tmp/JAMFQuickAdd/Binaries.tar.gz -C /private/tmp/JAMFQuickAdd
+/bin/mkdir -p /usr/local/bin
+if [ $major_version -lt 10 ] || [ $major_version -eq 10 -a $minor_version -lt 9 ];then
+  jamfCLIPath=/usr/sbin/jamf
+  /bin/rm /private/tmp/JAMFQuickAdd/Binaries/jamf
+  /bin/mv /private/tmp/JAMFQuickAdd/Binaries/jamf2 $jamfCLIPath
+else
+  jamfCLIPath=/usr/local/jamf/bin/jamf
+  /bin/rm /private/tmp/JAMFQuickAdd/Binaries/jamf2
+  /bin/mkdir -p /usr/local/jamf/bin
+  /bin/mv /private/tmp/JAMFQuickAdd/Binaries/jamf /usr/local/jamf/bin/jamf
+  /bin/ln -s /usr/local/jamf/bin/jamf /usr/local/bin
+fi
+
+/usr/sbin/chown 0:0 $jamfCLIPath
+/bin/chmod 551 $jamfCLIPath
+
+####################################################
+## Create the configuration file at:
+## /Library/Preferences/com.jamfsoftware.jamf.plist
+####################################################
+$jamfCLIPath createConf -url 'https://jss.yourcompany.com/'
+
+####################################################
+## Run enroll
+####################################################
+$jamfCLIPath enroll -invitation 000000000000000000000000000000000000 -noPolicy
+enrolled=$?
+if [ $enrolled -eq 0 ]
+then
+  $jamfCLIPath update
+  $jamfCLIPath policy -event enrollmentComplete
+  enrolled=$?
+fi
+
+####################################################
+## Run quickadd enrollment policies
+####################################################
+$jamfCLIPath policy -event qaenrollment
+
+/bin/rm -rf /private/tmp/JAMFQuickAdd
+exit $enrolled
